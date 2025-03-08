@@ -1,52 +1,42 @@
 from fastapi import FastAPI, HTTPException
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List
 
 app = FastAPI()
 
-db = {}  # In-memory database
+class Product(BaseModel):
+    id: int
+    name: str
+    price: float = Field(..., gt=0)
+    stock: int = Field(..., ge=0)
 
-class Product:
-    def __init__(self, id: int, name: str, description: Optional[str], price: float, stock: int):
-        self.id = id
-        self.name = name
-        self.description = description
-        self.price = price
-        self.stock = stock
+db = {}
 
-# Create a product
 @app.post("/products/")
-def create_product(id: int, name: str, description: Optional[str], price: float, stock: int):
-    if id in db:
+def create_product(product: Product):
+    if product.id in db:
         raise HTTPException(status_code=400, detail="Product ID already exists")
-    db[id] = Product(id, name, description, price, stock)
-    return db[id].__dict__
+    db[product.id] = product
+    return product
 
-# Read all products
-@app.get("/products/", response_model=List[dict])
+@app.get("/products/", response_model=List[Product])
 def get_products():
-    return [product.__dict__ for product in db.values()]
+    return list(db.values())
 
-# Read a single product
-@app.get("/products/{product_id}")
+@app.get("/products/{product_id}", response_model=Product)
 def get_product(product_id: int):
     if product_id not in db:
         raise HTTPException(status_code=404, detail="Product not found")
-    return db[product_id].__dict__
+    return db[product_id]
 
-# Update a product
 @app.put("/products/{product_id}")
-def update_product(product_id: int, name: str, description: Optional[str], price: float, stock: int):
+def update_product(product_id: int, product: Product):
     if product_id not in db:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    db[product_id].name = name
-    db[product_id].description = description
-    db[product_id].price = price
-    db[product_id].stock = stock
-    
-    return db[product_id].__dict__
+    db[product_id] = product
+    return product
 
-# Delete a product
 @app.delete("/products/{product_id}")
 def delete_product(product_id: int):
     if product_id not in db:
